@@ -1,7 +1,7 @@
 # HelltideChests_MaidenFarmerV3.0
 
 Route Optimizer
-The Route Optimizer (route_optimizer.lua) is a sophisticated system that:
+The Route Optimizer (route_optimizer.lua) is a system that:
 
 Path Management:
 Tracks whether an initial loop has been completed
