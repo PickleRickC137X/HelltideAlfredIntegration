@@ -39,3 +39,17 @@ Maintaining efficient movement patterns
 Providing visual feedback to the user
 Handling both farming and inventory management needs automatically
 This combination allows for extended farming sessions with minimal manual intervention while maintaining optimal efficiency.
+
+Stashing Requirements:
+Auto stash must be enabled (menu.auto_stash_boss_materials:get())
+Item must be a valid boss material
+Stack must be exactly 50 items
+Process Flow
+When inventory needs management:
+Plugin disables main functionality
+Teleports to Three of Whispers
+Processes items in order: stash boss materials → stash items → salvage → repair → sell
+After processing:
+Returns to previous location
+Resumes main functionality
+This system ensures efficient inventory management while maintaining valuable items and materials through specific criteria for selling and stashing.
