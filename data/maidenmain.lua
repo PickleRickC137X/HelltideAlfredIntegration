@@ -3,6 +3,7 @@ local GameStateChecker = require("functions.game_state_checker")
 local heart_insertion = require("functions.heart_insertion")
 local circular_movement = require("functions.circular_movement")
 local teleport = require("data.teleport")
+local explorer = require("data.explorer")
 
 local maidenmain = {}
 
@@ -75,10 +76,19 @@ local function calculate_wait_time(attempt)
 end
 
 function maidenmain.update_menu_states()
+    local updated = false
     for k, v in pairs(maidenmain.menu_elements) do
         if type(v) == "table" and v.get then
-            maidenmain[k] = v:get()
+            local value = v:get()
+            if maidenmain[k] ~= value then
+                maidenmain[k] = value
+                updated = true
+                console.print("Debug: Updated " .. k .. " to " .. tostring(value))
+            end
         end
+    end
+    if updated then
+        console.print("Debug: Menu states updated")
     end
 end
 
@@ -256,136 +266,97 @@ local persistent_helltide_start_time = 0
 local persistent_duration = 0  -- Nova variável para armazenar a duração
 
 function maidenmain.update(menu, current_position, ChestsInteractor, Movement, explorer_circle_radius)
-    maidenmain.update_menu_states()
+    -- Only log when maiden state changes
+    if not maidenmain.menu_elements.main_helltide_maiden_auto_plugin_enabled:get() then
+        return "disabled"
+    end
+
     local local_player = get_local_player()
     if not local_player then
-        console.print("No local player found")
+        console.print("Debug: Maiden - No local player found")
         return "error"
     end
 
-    local current_time = get_time_since_inject()
-
-    -- Verifica se não está em Helltide
-    if not GameStateChecker.is_in_helltide(local_player) then
-        console.print("Not in Helltide - Resetting timer")
-        persistent_helltide_start_time = 0
-        persistent_duration = 0
-        helltide_start_time = 0
-        time_elapsed = 0
-        return "disabled"
+    -- Update explorer circle radius if changed
+    if explorer_circle_radius ~= maidenmain.explorer_circle_radius then
+        maidenmain.explorer_circle_radius = explorer_circle_radius
+        console.print("Debug: Updated explorer circle radius to: " .. tostring(explorer_circle_radius))
     end
 
-    -- Se o plugin está desabilitado, apenas mantém o tempo decorrido
-    if not maidenmain.menu_elements.main_helltide_maiden_auto_plugin_enabled:get() then
-        if helltide_start_time > 0 then
-            time_elapsed = current_time - helltide_start_time
+    -- Explorer functionality
+    if maidenmain.menu_elements.main_helltide_maiden_auto_plugin_run_explorer:get() then
+        explorer.enable()
+        Movement.set_explorer_control(true)
+        
+        -- Explorer circle settings
+        if maidenmain.menu_elements.main_helltide_maiden_auto_plugin_show_explorer_circle:get() then
+            maidenmain.explorer_circle_radius = maidenmain.menu_elements.main_helltide_maiden_auto_plugin_explorer_circle_radius:get()
         end
-        return "disabled"
+        
+        -- Explorer threshold settings
+        local threshold = maidenmain.menu_elements.main_helltide_maiden_auto_plugin_explorer_threshold:get()
+        local variance = maidenmain.menu_elements.main_helltide_maiden_auto_plugin_explorer_thresholdvar:get()
+        explorer.set_threshold(threshold, variance)
     end
 
-    local game_state = GameStateChecker.check_game_state()
-    if game_state ~= "helltide" then
-        console.print("Not in Helltide. Disabling Maidenmain plugin.")
-        maidenmain.menu_elements.main_helltide_maiden_auto_plugin_enabled:set(false)
-        maidenmain.reset_helltide_state()
-        return "disabled"
+    -- Heart insertion functionality
+    if maidenmain.menu_elements.main_helltide_maiden_auto_plugin_insert_hearts:get() then
+        local should_insert = true
+        
+        -- Check conditions for heart insertion
+        if maidenmain.menu_elements.main_helltide_maiden_auto_plugin_insert_hearts_onlywithnpcs:get() then
+            should_insert = heart_insertion.check_players_in_range()
+        end
+        
+        if should_insert then
+            local interval = maidenmain.menu_elements.main_helltide_maiden_auto_plugin_insert_hearts_interval_slider:get()
+            heart_insertion.try_insert_hearts(interval)
+        end
     end
 
-    -- Inicializa a duração se ainda não foi definida
-    local nova_duracao = maidenmain.menu_elements.main_helltide_maiden_duration:get() * 60
-    if nova_duracao ~= persistent_duration then
-        if persistent_duration > 0 then
-            local tempo_ja_passado = current_time - persistent_helltide_start_time
-            persistent_duration = nova_duracao
-            -- Ajusta o tempo inicial para manter a proporção do tempo já passado
-            persistent_helltide_start_time = current_time - tempo_ja_passado
-            --console.print("Duração atualizada para: " .. nova_duracao/60 .. " minutos")
+    -- Find and move to nearest maiden
+    local nearest_maiden = nil
+    local min_distance = math.huge
+    for _, pos in ipairs(maidenmain.maiden_positions) do
+        local distance = current_position:distance(pos)
+        if distance < min_distance then
+            min_distance = distance
+            nearest_maiden = pos
+        end
+    end
+
+    if nearest_maiden then
+        -- Only log significant distance changes (e.g., > 50 units)
+        if min_distance > 50 then
+            console.print("Debug: Maiden - Distance to target: " .. math.floor(min_distance))
+        end
+        
+        maidenmain.helltide_final_maidenpos = nearest_maiden
+        
+        if maidenmain.menu_elements.main_helltide_maiden_auto_plugin_run_explorer:get() then
+            explorer.enable()
+            Movement.set_explorer_control(true)
+            circular_movement.move_in_circle(
+                nearest_maiden, 
+                maidenmain.explorer_circle_radius,
+                maidenmain.menu_elements.main_helltide_maiden_auto_plugin_run_explorer_close_first:get()
+            )
         else
-            -- Primeira inicialização da duração
-            persistent_duration = nova_duracao
-            --console.print("Definindo duração inicial: " .. persistent_duration/60 .. " minutos")
-        end
-    end
-
-    -- Inicializa o tempo de início se ainda não foi definido
-    if persistent_helltide_start_time == 0 then
-        persistent_helltide_start_time = current_time - time_elapsed
-        --console.print("Definindo tempo inicial: " .. persistent_helltide_start_time)
-    end
-
-    -- Verifica e carrega waypoints se necessário
-    if helltide_start_time == 0 or not helltide_origin_city then
-        if maidenmain.determine_helltide_origin_city() then
-            helltide_start_time = current_time - time_elapsed
-            local waypoints, zone_id = waypoint_loader.load_route(helltide_origin_city, true)
-            if waypoints then
-                Movement.set_waypoints(waypoints)
-                local tempo_restante = math.floor((persistent_duration - (current_time - persistent_helltide_start_time)) / 60)
-                console.print("Waypoints loaded for Helltide's origin city: " .. helltide_origin_city)
-                --console.print("Tempo restante: " .. tempo_restante .. " minutos")
-            else
-                console.print("Failed to load waypoints for Helltide's origin city.")
-                return "error"
-            end
-        else
-            console.print("Failed to determine Helltide's city of origin. Trying again next cycle.")
-            return "error"
-        end
-    end
-
-    -- Verifica se o tempo total já passou
-    if current_time - persistent_helltide_start_time > persistent_duration then
-        local result = maidenmain.switch_to_chest_farming(ChestsInteractor, Movement)
-        if result == "teleport_success" then
-            console.print("Teleport successful. Activating main plugin and deactivating Maidenmain.")
-            menu.plugin_enabled:set(true)
-            maidenmain.menu_elements.main_helltide_maiden_auto_plugin_enabled:set(false)
+            Movement.set_target_position(nearest_maiden)
             Movement.set_moving(true)
-            return "teleport_success"
-        elseif result == "waiting" or result == "in_progress" or result == "started" then
-            return result
-        else
-            console.print("Unexpected error when transitioning to chest farming.")
-            maidenmain.menu_elements.main_helltide_maiden_auto_plugin_enabled:set(false)
-            return "error"
+        end
+        
+        return "running"
+    end
+
+    -- Auto revive functionality
+    if maidenmain.menu_elements.main_helltide_maiden_auto_plugin_auto_revive:get() then
+        if local_player:is_dead() then
+            local_player:revive()
         end
     end
-    
-    -- Atualiza a posição da Maiden mais próxima
-    maidenmain.helltide_final_maidenpos = maidenmain.find_nearest_maiden_position()
-    local player_position = local_player:get_position()
-    
-    -- Verifica e executa o movimento circular
-    if circular_movement.is_near_maiden(player_position, maidenmain.helltide_final_maidenpos, maidenmain.explorer_circle_radius) then
-        circular_movement.update(maidenmain.menu_elements, maidenmain.helltide_final_maidenpos, maidenmain.explorer_circle_radius)
-    else
-        --console.print("Player fora do círculo da maiden, permanecendo em IDLE")
-    end
 
-    -- Atualiza a inserção de corações
-    heart_insertion.update(maidenmain.menu_elements, maidenmain.helltide_final_maidenpos, maidenmain.explorer_circle_radius)
-
-    -- Verifica e executa auto-revive se necessário
-    if maidenmain.menu_elements.main_helltide_maiden_auto_plugin_auto_revive:get() and local_player:is_dead() then
-        console.print("Auto-reviving player")
-        local_player:revive()
-    end
-
-    -- Verifica e executa reset se solicitado
-    if maidenmain.menu_elements.main_helltide_maiden_auto_plugin_reset:get() then
-        console.print("Resetting Maidenmain")
-        maidenmain.explorer_point = nil
-        maidenmain.helltide_final_maidenpos = maidenmain.maiden_positions[1]
-        maidenmain.menu_elements.main_helltide_maiden_auto_plugin_reset:set(false)
-    end
-
-    -- Debug do tempo
-    --console.print("Duração definida: " .. tostring(persistent_duration))
-    --console.print("Tempo inicial: " .. tostring(persistent_helltide_start_time))
-    --console.print("Tempo atual: " .. tostring(current_time))
-    --console.print("Tempo restante: " .. tostring(persistent_duration - (current_time - persistent_helltide_start_time)))
-
-    return "running"
+    return "no_maiden_found"
 end
 
 function maidenmain.reset_helltide_state()

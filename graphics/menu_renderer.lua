@@ -12,70 +12,45 @@ local function safe_render(menu_item, label, description, value)
     menu_item:render(label, description, value)
 end
 
-function menu_renderer.render_menu(
-    plugin_enabled, 
-    doorsEnabled, 
-    loopEnabled, 
-    revive_enabled, 
-    moveThreshold,
-    vendor_enabled,
-    during_helltide,
-    end_helltide,
-    repair,
-    sell,
-    salvage,
-    stash,
-    stash_boss,
-    auto_move,
-    items_threshold,
-    greater_affix_threshold
-)
-    if menu.main_tree:push("HellChest Farmer (EletroLuz)-V3.0") then
-        -- Seção principal existente
-        safe_render(menu.plugin_enabled, "Enable Plugin Chests Farm", "Enable or disable the chest farm plugin", plugin_enabled)
-        safe_render(menu.main_openDoors_enabled, "Open Chests", "Enable or disable the chest plugin", doorsEnabled)
-        safe_render(menu.loop_enabled, "Enable Loop", "Enable or disable looping waypoints", loopEnabled)
-        safe_render(menu.revive_enabled, "Enable Revive Module", "Enable or disable the revive module", revive_enabled)
-
-        -- Seção Move Threshold existente
-        if menu.move_threshold_tree:push("Chest Move Range Settings") then
-            safe_render(menu.move_threshold_slider, "Move Range", "maximum distance the player can detect and move towards a chest in the game", moveThreshold)
-            menu.move_threshold_tree:pop()
-        end
-
-        -- Nova seção Vendor Manager
-        if menu.vendor_manager_tree:push("Vendor Manager") then
-            safe_render(menu.vendor_enabled, "Enable Vendor Manager", "Enable or disable the vendor manager", vendor_enabled)
-            safe_render(menu.enable_during_helltide, "Enable During Helltide", "Automatically manage vendors while Helltide is active", during_helltide)
-            --safe_render(menu.enable_end_helltide, "Enable End Helltide", "Automatically manage vendors when Helltide ends", end_helltide)
-
-            if menu.actions_tree:push("Automatic Actions") then
-                safe_render(menu.auto_repair, "Auto Repair", "Automatically repair items when visiting vendor", repair)
-                safe_render(menu.auto_sell, "Auto Sell", "Automatically sell items when visiting vendor", sell)
-                safe_render(menu.auto_salvage, "Auto Salvage", "Automatically salvage items at blacksmith", salvage)
-                safe_render(menu.auto_stash, "Auto Stash", "Automatically stash items with Greater Affixes >= threshold", stash)
-                safe_render(menu.auto_stash_boss_materials, "Auto Stash Boss Materials", "Automatically stash boss materials when stack reaches 50", stash_boss)
-                menu.actions_tree:pop()
-            end
-
-            if menu.settings_tree:push("Settings") then
-                --safe_render(menu.auto_move, "Auto Move to Vendor", "Automatically move to nearest vendor", auto_move)
-                safe_render(menu.items_threshold, "Items Threshold (1-33)", "Number of items before selling/salvaging", items_threshold)
-                safe_render(menu.greater_affix_threshold, "Greater Affix Threshold (0-4)", "0=Sell all, 1+=Keep items with X or more Greater Affixes", greater_affix_threshold)
-                menu.settings_tree:pop()
-            end
-
-            menu.vendor_manager_tree:pop()
-        end
-
-        -- Existing Helltide Maiden section
-        if menu.main_tree:push("Helltide Maiden") then
-            maidenmain.render_menu()
-            menu.main_tree:pop()
-        end
-
-        menu.main_tree:pop()
+function menu_renderer.render_menu(plugin_enabled, open_doors_enabled, loop_enabled, revive_enabled, indent)
+    if not menu.main_tree:push("Helltide Farmer (EletroLuz)-V3.0") then
+        return
     end
+
+    -- Render movement plugin
+    menu.plugin_enabled:render("Enable Plugin Chests Farm", "Enable or disable the chest farm plugin", 0)
+
+    -- Render o checkbox enable open chests
+    menu.main_openDoors_enabled:render("Open Chests", "Enable or disable the chest plugin", 0)
+
+    -- Render checkbox loop
+    menu.loop_enabled:render("Enable Loop", "Enable or disable looping waypoints", 0)
+
+    -- Render revive
+    menu.revive_enabled:render("Enable Revive Module", "Enable or disable the revive module", 0)
+
+    -- Subsection Move Threshold
+    if menu.move_threshold_tree:push("Chest Move Range Settings") then
+        menu.move_threshold_slider:render("Move Threshold", "Set Chest Max Move distance", 2)
+        menu.move_threshold_tree:pop()
+    end
+
+    -- Subsection Maiden Farmer
+    if menu.maiden_tree:push("Maiden Farmer Settings") then
+        menu.main_helltide_maiden_auto_plugin_enabled:render("Enable Maiden Farmer", "Enable or disable the Maiden farmer", 0)
+        menu.main_helltide_maiden_duration:render("Maiden Duration (minutes)", "Duration of Maiden farming before switching to chests", 0)
+        menu.maiden_tree:pop()
+    end
+
+    -- Subsection Vendor Manager (Alfred)
+    if menu.vendor_manager_tree:push("Alfred Vendor Manager") then
+        menu.vendor_enabled:render("Enable Alfred Vendor Manager", "Enable or disable Alfred's vendor management", 0)
+        menu.auto_return:render("Auto Return After Vendor", "Automatically return to previous location after vendor visit", 0)
+        menu.enable_during_helltide:render("Enable During Helltide", "Allow Alfred to manage inventory during Helltide", 0)
+        menu.vendor_manager_tree:pop()
+    end
+
+    menu.main_tree:pop()
 end
 
 return menu_renderer

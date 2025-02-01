@@ -14,7 +14,7 @@ local GameStateChecker = require("functions.game_state_checker")
 local RouteOptimizer = require("functions.route_optimizer")
 local maidenmain = require("data.maidenmain")
 maidenmain.menu_elements.main_helltide_maiden_auto_plugin_enabled:set(false)
-local vendor_manager = require("data.vendor_manager")
+local alfred = require("services.alfred")  -- Keep Alfred import
 
 -- Initialize variables
 local PluginState = {
@@ -171,51 +171,41 @@ local function handle_helltide()
     local current_time = get_time_since_inject()
     
     if not was_in_helltide then
-        console.print("Entered Helltide. Initializing Helltide operations.")
+        console.print("Debug: Entering helltide - Maiden enabled: " .. tostring(maidenmain_enabled))
         was_in_helltide = true
         Movement.reset(maidenmain_enabled)
         load_and_set_waypoints(maidenmain_enabled)
         ChestsInteractor.clearInteractedObjects()
         ChestsInteractor.clearAllBlacklists()
-        ChestsInteractor.clear_missed_chests()  -- Limpa a lista de baús perdidos
+        ChestsInteractor.clear_missed_chests()
         helltide_start_time = current_time
         explorer.enable()
-    end
-
-    if current_time - last_cinders_update >= cinders_update_interval then
-        ChestsInteractor.update_cinders()
-        last_cinders_update = current_time
+        
+        if maidenmain_enabled then
+            console.print("Starting Maiden farming in Helltide")
+        end
     end
 
     if maidenmain_enabled then
         local duration = maidenmain.menu_elements.main_helltide_maiden_duration:get() * 60
+        
         if current_time - helltide_start_time > duration then
             local result = maidenmain.switch_to_chest_farming(ChestsInteractor, Movement)
             if result == "teleport_success" then
+                console.print("Debug: Switching from Maiden to Chest farming")
                 start_chest_farming()
                 return
-            elseif result == "waiting" or result == "in_progress" then
-                return
-            else
-                console.print("Failed to transition to chest farming. Result: " .. tostring(result))
             end
         else
             local local_player = get_local_player()
-            local current_position = local_player:get_position()
-            maidenmain.update(menu, current_position, ChestsInteractor, Movement, maidenmain.menu_elements.main_helltide_maiden_auto_plugin_explorer_circle_radius:get())
-            actors.update()
+            if local_player then
+                local current_position = local_player:get_position()
+                maidenmain.update(menu, current_position, ChestsInteractor, Movement, 
+                    maidenmain.menu_elements.main_helltide_maiden_auto_plugin_explorer_circle_radius:get())
+                actors.update()
+            end
         end
-    else
-        local current_waypoint_index = Movement.get_current_waypoint_index()
-        ChestsInteractor.interactWithObjects(
-            menu.main_openDoors_enabled:get(), 
-            interactive_patterns,
-            current_waypoint_index
-        )
-        actors.update()
     end
-
-    Movement.pulse(plugin_enabled or maidenmain_enabled, menu.loop_enabled:get(), teleport, maidenmain_enabled)
 
     Movement.pulse(plugin_enabled or maidenmain_enabled, menu.loop_enabled:get(), teleport, maidenmain_enabled)
     
@@ -280,6 +270,31 @@ on_update(function()
 
     periodic_cleanup()
 
+    -- Add Alfred integration here with minimal logging
+    if PLUGIN_alfred_the_butler and menu.vendor_enabled:get() then
+        local local_player = get_local_player()
+        if local_player then
+            local status = PLUGIN_alfred_the_butler.get_status()
+            if status.inventory_full and
+                (status.sell_count > 0 or status.salvage_count > 0) or
+                -- boss item
+                #local_player:get_consumable_items() == 33 or
+                -- compass
+                #local_player:get_dungeon_key_items() == 33
+            then
+                local current_pos = local_player:get_position()
+                console.print("Inventory full - Triggering Alfred for inventory management")
+                PLUGIN_alfred_the_butler.trigger_tasks_with_teleport('helltide_chests', function()
+                    console.print("Alfred tasks completed")
+                    if menu.auto_return:get() then
+                        teleport.return_to_position(current_pos)
+                    end
+                end)
+                return
+            end
+        end
+    end
+
     local game_state = GameStateChecker.check_game_state()
     --console.print("Current game state: " .. game_state)
     --console.print("Current plugin state: " .. current_state)
@@ -328,7 +343,7 @@ end
 
 on_render_menu(function()
     menu_renderer.render_menu(plugin_enabled, menu.main_openDoors_enabled:get(), menu.loop_enabled:get(), 
-                              menu.revive_enabled:get())
+                              menu.revive_enabled:get(), 0)
 end)
 
 on_render(function()

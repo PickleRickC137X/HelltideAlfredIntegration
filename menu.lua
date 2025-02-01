@@ -12,24 +12,27 @@ local menu_elements =
     move_threshold_tree = tree_node:new(2),
     move_threshold_slider = slider_int:new(12, 20, 12, get_hash(plugin_label .. "move_threshold_slider")),
 
-    -- Subsection Vendor Manager
-    vendor_manager_tree = tree_node:new(3),
+    -- Subsection Maiden Farmer
+    maiden_tree = tree_node:new(3),
+    main_helltide_maiden_auto_plugin_enabled = checkbox:new(false, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_enabled")),
+    main_helltide_maiden_duration = slider_float:new(1.0, 60.0, 30.0, get_hash(plugin_label .. "main_helltide_maiden_duration")),
+    main_helltide_maiden_auto_plugin_run_explorer = checkbox:new(true, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_run_explorer")),
+    main_helltide_maiden_auto_plugin_auto_revive = checkbox:new(true, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_auto_revive")),
+    main_helltide_maiden_auto_plugin_show_task = checkbox:new(true, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_show_task")),
+    main_helltide_maiden_auto_plugin_show_explorer_circle = checkbox:new(true, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_show_explorer_circle")),
+    main_helltide_maiden_auto_plugin_run_explorer_close_first = checkbox:new(true, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_run_explorer_close_first")),
+    main_helltide_maiden_auto_plugin_explorer_threshold = slider_float:new(0.0, 20.0, 1.5, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_explorer_threshold")),
+    main_helltide_maiden_auto_plugin_explorer_thresholdvar = slider_float:new(0.0, 10.0, 3.0, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_explorer_thresholdvar")),
+    main_helltide_maiden_auto_plugin_explorer_circle_radius = slider_float:new(5.0, 30.0, 15.0, get_hash(plugin_label .. "main_helltide_maiden_auto_plugin_explorer_circle_radius")),
+
+    -- Subsection Vendor Manager (Alfred)
+    vendor_manager_tree = tree_node:new(4),
     vendor_enabled = checkbox:new(false, get_hash("VENDOR_MANAGER_enabled")),
-    auto_repair = checkbox:new(false, get_hash("VENDOR_MANAGER_repair")),
-    auto_sell = checkbox:new(false, get_hash("VENDOR_MANAGER_sell")),
-    auto_salvage = checkbox:new(false, get_hash("VENDOR_MANAGER_salvage")),
-    auto_stash = checkbox:new(false, get_hash("VENDOR_MANAGER_stash")),
-    auto_stash_boss_materials = checkbox:new(false, get_hash("VENDOR_MANAGER_stash_boss")),
-    enable_during_helltide = checkbox:new(false, get_hash("VENDOR_MANAGER_during_helltide")),
-    --enable_end_helltide = checkbox:new(false, get_hash("VENDOR_MANAGER_end_helltide")),
-    --auto_move = checkbox:new(false, get_hash("VENDOR_MANAGER_move")),
-    items_threshold = slider_int:new(1, 33, 33, get_hash(plugin_label .. "items_threshold_slider")),
-    greater_affix_threshold = slider_int:new(0, 4, 1, get_hash("VENDOR_MANAGER_greater_affix")),
-    actions_tree = tree_node:new(4),
-    settings_tree = tree_node:new(5),
+    auto_return = checkbox:new(true, get_hash(plugin_label .. "auto_return")),
+    enable_during_helltide = checkbox:new(false, get_hash("VENDOR_MANAGER_during_helltide"))
 }
 
-function render_menu()
+menu_elements.render_menu = function()
     menu_elements.main_tree:push("Helltide Farmer (EletroLuz)-V3.0")
 
     -- Render movement plugin
@@ -50,28 +53,26 @@ function render_menu()
         menu_elements.move_threshold_tree:pop()
     end
 
-    -- Subsection Vendor Manager
-    if menu_elements.vendor_manager_tree:push("Vendor Manager") then
-        menu_elements.vendor_enabled:render("Enable Vendor Manager", "Enable or disable the vendor manager")
-        menu_elements.enable_during_helltide:render("Enable During Helltide", "Automatically manage vendors while Helltide is active")
-        --menu_elements.enable_end_helltide:render("Enable End Helltide", "Automatically manage vendors when Helltide ends")
-        
-        if menu_elements.actions_tree:push("Automatic Actions") then
-            menu_elements.auto_repair:render("Auto Repair", "Automatically repair items when visiting vendor")
-            menu_elements.auto_sell:render("Auto Sell", "Automatically sell items when visiting vendor")
-            menu_elements.auto_salvage:render("Auto Salvage", "Automatically salvage items at blacksmith")
-            menu_elements.auto_stash:render("Auto Stash", "Automatically stash items with Greater Affixes >= threshold")
-            menu_elements.auto_stash_boss_materials:render("Auto Stash Boss Materials", "Automatically stash boss materials when stack reaches 50")
-            menu_elements.actions_tree:pop()
-        end
-        
-        if menu_elements.settings_tree:push("Settings") then
-            --menu_elements.auto_move:render("Auto Move to Vendor", "Automatically move to nearest vendor")
-            menu_elements.items_threshold:render("Items Threshold (1-33)", "Number of items before selling/salvaging")
-            menu_elements.greater_affix_threshold:render("Greater Affix Threshold (0-4)", "0=Sell all, 1+=Keep items with X or more Greater Affixes")
-            menu_elements.settings_tree:pop()
-        end
-        
+    -- Subsection Maiden Farmer
+    if menu_elements.maiden_tree:push("Maiden Farmer Settings") then
+        menu_elements.main_helltide_maiden_auto_plugin_enabled:render("Enable Maiden Farmer", "Enable or disable the Maiden farmer", 0, 0)
+        menu_elements.main_helltide_maiden_duration:render("Maiden Duration (minutes)", "Duration of Maiden farming before switching to chests", 0, 0)
+        menu_elements.main_helltide_maiden_auto_plugin_run_explorer:render("Run Explorer", "Enable or disable explorer for Maiden", 0, 0)
+        menu_elements.main_helltide_maiden_auto_plugin_auto_revive:render("Auto Revive", "Enable or disable auto revive for Maiden", 0, 0)
+        menu_elements.main_helltide_maiden_auto_plugin_show_task:render("Show Task", "Show current Maiden task", 0, 0)
+        menu_elements.main_helltide_maiden_auto_plugin_show_explorer_circle:render("Show Explorer Circle", "Show explorer circle for Maiden", 0, 0)
+        menu_elements.main_helltide_maiden_auto_plugin_run_explorer_close_first:render("Run Explorer Close First", "Run explorer on closest targets first", 0, 0)
+        menu_elements.main_helltide_maiden_auto_plugin_explorer_threshold:render("Explorer Threshold", "Set explorer threshold distance", 0, 0)
+        menu_elements.main_helltide_maiden_auto_plugin_explorer_thresholdvar:render("Explorer Threshold Variance", "Set explorer threshold variance", 0, 0)
+        menu_elements.main_helltide_maiden_auto_plugin_explorer_circle_radius:render("Explorer Circle Radius", "Set explorer circle radius", 0, 0)
+        menu_elements.maiden_tree:pop()
+    end
+
+    -- Subsection Vendor Manager (Alfred)
+    if menu_elements.vendor_manager_tree:push("Alfred Vendor Manager") then
+        menu_elements.vendor_enabled:render("Enable Alfred Vendor Manager", "Enable or disable Alfred's vendor management")
+        menu_elements.auto_return:render("Auto Return After Vendor", "Automatically return to previous location after vendor visit")
+        menu_elements.enable_during_helltide:render("Enable During Helltide", "Allow Alfred to manage inventory during Helltide")
         menu_elements.vendor_manager_tree:pop()
     end
 
